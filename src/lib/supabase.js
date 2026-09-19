@@ -19,13 +19,15 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 export const signUp = async ({ email, password, nome, cognome, citta }) => {
   const { data, error } = await supabase.auth.signUp({ email, password });
   if (error) throw error;
-  // Aggiorna profilo con dati extra
-  await supabase.from("profiles").upsert({
-    id: data.user.id,
-    nome,
-    cognome,
-    citta,
-  });
+  if (data.user) {
+    const { error: profileError } = await supabase.from("profiles").insert({
+      id: data.user.id,
+      nome,
+      cognome,
+      citta,
+    });
+    if (profileError) throw profileError;
+  }
   return data;
 };
 
