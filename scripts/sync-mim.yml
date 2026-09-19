@@ -1,0 +1,41 @@
+name: MIM Data Sync
+
+on:
+  schedule:
+    - cron: '0 3 1 * *'   # ogni 1° del mese alle 03:00 UTC
+  workflow_dispatch:        # run manuale dalla UI GitHub
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install deps
+        run: pip install requests pandas supabase
+
+      - name: Run sync
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scripts/sync_mim.py
+
+      - name: Notify on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `MIM Sync fallito – ${new Date().toISOString().split('T')[0]}`,
+              body: 'Il job di sincronizzazione dati MIM è fallito. Controlla i log del workflow.',
+              labels: ['bug', 'data-sync']
+            })
