@@ -105,13 +105,18 @@ export function ProfileScreen() {
           <div style={{color:"var(--muted)",fontSize:13,marginBottom:12,padding:"12px 0"}}>Nessun figlio registrato</div>
         )}
         {children.map(c => (
-          <div key={c.id} className="card card-row">
+          <div key={c.id} className="card card-row" style={{cursor:"pointer"}}
+            onClick={() => {
+              sessionStorage.setItem("selected_child", JSON.stringify(c));
+              navigate("/profilo/libri-figlio");
+            }}>
             <div className="avatar" style={{background:"#6366F1"}}>{c.nome[0]}</div>
             <div style={{flex:1,marginLeft:10}}>
               <div style={{fontWeight:600,fontSize:14}}>{c.nome}</div>
               <div style={{fontSize:12,color:"var(--muted)"}}>{c.anno_classe}ª {c.sezione} · {c.schools?.nome || "Scuola non trovata"}</div>
               <div style={{fontSize:11,color:"var(--muted)"}}>{c.anno_scolastico}</div>
             </div>
+            <span style={{fontSize:18,color:"var(--muted)"}}>›</span>
           </div>
         ))}
         <button className="btn btn-secondary" style={{marginBottom:24}} onClick={()=>navigate("/profilo/aggiungi-figlio")}>

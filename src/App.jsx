@@ -8,6 +8,8 @@ import ListingsScreen from "./screens/ListingsScreen";
 import ProfileScreen from "./screens/ProfileScreen";
 import AddChildScreen from "./screens/AddChildScreen";
 import CreateListingScreen from "./screens/CreateListingScreen";
+import ChildBooksScreen from "./screens/ChildBooksScreen";
+
 
 // Tab bar condivisa
 function TabBar() {
@@ -44,6 +46,7 @@ function AppLayout() {
         <Route path="/profilo/aggiungi-figlio" element={<AddChildScreen />} />
         <Route path="/pubblica" element={<CreateListingScreen />} />
         <Route path="*" element={<Navigate to="/cerca" replace />} />
+        <Route path="/profilo/libri-figlio" element={<ChildBooksScreen />} />
       </Routes>
       <TabBar />
     </>
