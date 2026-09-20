@@ -19,19 +19,30 @@ export default function AuthScreen({ onAuth }) {
   };
 
   const submit = async (ev) => {
-    ev.preventDefault();
-    if (!validate()) return;
-    setLoading(true);
-    try {
-      if (mode === "login") await signIn({ email: form.email, password: form.password });
-      else await signUp({ email: form.email, password: form.password, nome: form.nome, cognome: form.cognome, citta: form.citta });
-      onAuth();
-    } catch (err) {
-      setErrors({ _global: err.message });
-    } finally {
-      setLoading(false);
+  ev.preventDefault();
+  if (!validate()) return;
+  setLoading(true);
+  try {
+    if (mode === "login") {
+      await signIn({ email: form.email, password: form.password });
+    } else {
+      await signUp({ 
+        email: form.email, 
+        password: form.password, 
+        nome: form.nome, 
+        cognome: form.cognome, 
+        citta: form.citta 
+      });
+      setErrors({ _global: "✅ Account creato! Controlla la tua email per confermare." });
+      return;
     }
-  };
+    onAuth();
+  } catch (err) {
+    setErrors({ _global: err.message });
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="screen" style={{ paddingBottom: 0 }}>
