@@ -23,7 +23,7 @@ export function ListingsScreen() {
       <div className="top-bar"><h1>Annunci</h1></div>
       <div className="content">
         {loading ? <div className="spinner"/> : listings.length === 0 ? (
-          <div className="empty"><div className="empty-icon">📭</div><div className="empty-title">Nessun annuncio</div></div>
+          <div className="empty"><div className="empty-icon">📭</div><div className="empty-title">Nessun annuncio</div><div className="empty-text">Quando qualcuno pubblica un libro appare qui</div></div>
         ) : listings.map(l => {
           const color = AVATAR_COLORS[l.user_id?.charCodeAt(0) % AVATAR_COLORS.length] || AVATAR_COLORS[0];
           const initials = `${l.profiles?.nome?.[0]||""}${l.profiles?.cognome?.[0]||""}`.toUpperCase();
@@ -91,7 +91,6 @@ export function ProfileScreen() {
     <div className="screen">
       <div className="top-bar"><h1>Profilo</h1></div>
       <div className="content">
-        {/* Avatar */}
         <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:20}}>
           <div className="avatar" style={{background:"var(--indigo)",width:56,height:56,fontSize:20,borderRadius:"50%"}}>{initials||"?"}</div>
           <div style={{flex:1}}>
@@ -101,14 +100,16 @@ export function ProfileScreen() {
           <button onClick={signOut} style={{background:"none",border:"none",color:"var(--red)",fontSize:13,cursor:"pointer",fontFamily:"inherit",fontWeight:500}}>Esci</button>
         </div>
 
-        {/* Figli */}
         <div className="section-label">I miei figli</div>
+        {children.length === 0 && (
+          <div style={{color:"var(--muted)",fontSize:13,marginBottom:12,padding:"12px 0"}}>Nessun figlio registrato</div>
+        )}
         {children.map(c => (
           <div key={c.id} className="card card-row">
             <div className="avatar" style={{background:"#6366F1"}}>{c.nome[0]}</div>
             <div style={{flex:1,marginLeft:10}}>
               <div style={{fontWeight:600,fontSize:14}}>{c.nome}</div>
-              <div style={{fontSize:12,color:"var(--muted)"}}>{c.anno_classe}ª {c.sezione} · {c.schools?.nome}</div>
+              <div style={{fontSize:12,color:"var(--muted)"}}>{c.anno_classe}ª {c.sezione} · {c.schools?.nome || "Scuola non trovata"}</div>
               <div style={{fontSize:11,color:"var(--muted)"}}>{c.anno_scolastico}</div>
             </div>
           </div>
@@ -117,16 +118,18 @@ export function ProfileScreen() {
           + Aggiungi figlio
         </button>
 
-        {/* Annunci */}
         <div className="section-label">I miei annunci ({myListings.length})</div>
+        {myListings.length === 0 && (
+          <div style={{color:"var(--muted)",fontSize:13,marginBottom:12,padding:"12px 0"}}>Nessun annuncio pubblicato</div>
+        )}
         {myListings.map(l => (
           <div key={l.id} className="card" style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontWeight:600,fontSize:14,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",marginBottom:4}}>{l.titolo||l.isbn}</div>
               <span className={`badge badge-${l.stato}`}>{l.stato}</span>
             </div>
-            <div style={{display:"flex",gap:6,flexShrink:0,marginLeft:10}}>
-              <span style={{fontSize:16,fontWeight:700,color:"var(--indigo)",marginRight:8}}>€{Number(l.prezzo).toFixed(2)}</span>
+            <div style={{display:"flex",gap:6,flexShrink:0,marginLeft:10,alignItems:"center"}}>
+              <span style={{fontSize:16,fontWeight:700,color:"var(--indigo)",marginRight:4}}>€{Number(l.prezzo).toFixed(2)}</span>
               <button className="btn-sm btn-sm-outline" onClick={()=>toggleStatus(l)}>{l.stato==="disponibile"?"Venduto":"Riattiva"}</button>
               <button className="btn-sm btn-sm-danger" onClick={()=>handleDeleteListing(l.id)}>✕</button>
             </div>
@@ -145,31 +148,42 @@ export function ProfileScreen() {
 export function AddChildScreen() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState({ nome:"", anno_classe:"", sezione:"", codice_istituto:"", anno_scolastico: annoScolasticoCorrente() });
+  const [form, setForm] = useState({ nome:"", anno_classe:"", sezione:"", indirizzo:"", codice_istituto:"", anno_scolastico: annoScolasticoCorrente() });
   const [scuoleList, setScuoleList] = useState([]);
   const [selectedScuola, setSelectedScuola] = useState(null);
   const [queryScuola, setQueryScuola] = useState("");
   const [saving, setSaving] = useState(false);
+  const [dbVuoto, setDbVuoto] = useState(false);
   const set = (k,v) => setForm(p => ({...p,[k]:v}));
 
   const cercaScuole = async (q) => {
     setQueryScuola(q);
-    if (q.length < 2) { setScuoleList([]); return; }
+    if (q.length < 2) { setScuoleList([]); setDbVuoto(false); return; }
     const data = await searchScuole(q);
     setScuoleList(data);
+    if (data.length === 0 && q.length >= 2) setDbVuoto(true);
+    else setDbVuoto(false);
   };
 
   const salva = async (e) => {
     e.preventDefault();
-    if (!form.nome || !form.anno_classe || !form.codice_istituto) { alert("Nome, anno e scuola sono obbligatori"); return; }
+    if (!form.nome || !form.anno_classe) { alert("Nome e anno sono obbligatori"); return; }
     setSaving(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      await addChild(user.id, form);
+      // Se non ha selezionato una scuola dal DB, salva comunque con il testo libero
+      const childData = {
+        ...form,
+        codice_istituto: form.codice_istituto || null,
+      };
+      await addChild(user.id, childData);
       navigate("/profilo");
     } catch(err) { alert(err.message); }
     finally { setSaving(false); }
   };
+
+  // Indirizzi scolastici comuni per l'autocomplete
+  const INDIRIZZI = ["Informatica","Scientifico","Classico","Linguistico","Artistico","Liceo delle Scienze Umane","Geometri","Ragioneria","Turistico","Meccanica","Elettronica","Chimica"];
 
   return (
     <div className="screen">
@@ -185,10 +199,21 @@ export function AddChildScreen() {
         {step === 1 && (
           <form onSubmit={e=>{e.preventDefault();setStep(2);}}>
             <div style={{fontSize:18,fontWeight:700,marginBottom:20}}>Chi è tuo figlio?</div>
+
             <div className="field-group">
               <label className="field-label">Nome</label>
               <input className="field" placeholder="es. Giulia" value={form.nome} onChange={e=>set("nome",e.target.value)} required autoCapitalize="words" />
             </div>
+
+            <div className="field-group">
+              <label className="field-label">Anno scolastico</label>
+              <div className="pill-group">
+                {[annoScolasticoCorrente()].map(a => (
+                  <button type="button" key={a} className={`pill ${form.anno_scolastico===a?"active":""}`} onClick={()=>set("anno_scolastico",a)}>{a}</button>
+                ))}
+              </div>
+            </div>
+
             <div className="field-group">
               <label className="field-label">Anno di corso</label>
               <div className="pill-group">
@@ -197,17 +222,36 @@ export function AddChildScreen() {
                 ))}
               </div>
             </div>
+
             <div className="field-group">
-              <label className="field-label">Sezione (opzionale)</label>
-              <input className="field" placeholder="es. A" maxLength={2} value={form.sezione} onChange={e=>set("sezione",e.target.value)} style={{width:80}} />
+              <label className="field-label">Sezione</label>
+              <input
+                className="field"
+                placeholder="es. A, Inf, 4A..."
+                maxLength={10}
+                value={form.sezione}
+                onChange={e=>set("sezione",e.target.value.toUpperCase())}
+                style={{width:120}}
+              />
             </div>
+
+            <div className="field-group">
+              <label className="field-label">Indirizzo scolastico</label>
+              <select className="field" value={form.indirizzo} onChange={e=>set("indirizzo",e.target.value)}>
+                <option value="">Seleziona indirizzo (opzionale)</option>
+                {INDIRIZZI.map(i => <option key={i} value={i}>{i}</option>)}
+              </select>
+            </div>
+
             <button className="btn btn-primary" type="submit" disabled={!form.nome||!form.anno_classe}>Avanti →</button>
           </form>
         )}
 
         {step === 2 && (
           <form onSubmit={salva}>
-            <div style={{fontSize:18,fontWeight:700,marginBottom:20}}>Quale scuola frequenta?</div>
+            <div style={{fontSize:18,fontWeight:700,marginBottom:8}}>Quale scuola frequenta?</div>
+            <div style={{fontSize:13,color:"var(--muted)",marginBottom:16}}>Cerca per nome o città</div>
+
             {selectedScuola ? (
               <div className="selected-scuola">
                 <div>
@@ -218,20 +262,28 @@ export function AddChildScreen() {
               </div>
             ) : (
               <div className="field-group">
-                <label className="field-label">Cerca scuola</label>
-                <input className="field" placeholder="Nome scuola o città..." value={queryScuola} onChange={e=>cercaScuole(e.target.value)} />
+                <input className="field" placeholder="es. Liceo Fermi, Roma..." value={queryScuola} onChange={e=>cercaScuole(e.target.value)} autoFocus />
               </div>
             )}
+
+            {/* Messaggio DB vuoto */}
+            {dbVuoto && (
+              <div style={{background:"var(--amber-light)",borderRadius:10,padding:"12px 14px",marginBottom:12,fontSize:13,color:"var(--amber)"}}>
+                ⚠️ Il database delle scuole non è ancora caricato. Puoi salvare il figlio lo stesso — la scuola verrà associata in seguito.
+              </div>
+            )}
+
             {scuoleList.map(sc => (
               <div key={sc.codice_istituto} className="card" style={{cursor:"pointer"}} onClick={()=>{setSelectedScuola(sc);set("codice_istituto",sc.codice_istituto);setScuoleList([]);setQueryScuola("");}}>
                 <div style={{fontWeight:600,fontSize:14}}>🏫 {sc.nome}</div>
-                <div style={{fontSize:12,color:"var(--muted)"}}>{sc.comune} · {sc.codice_istituto}</div>
+                <div style={{fontSize:12,color:"var(--muted)"}}>{sc.comune} ({sc.provincia}) · {sc.codice_istituto}</div>
               </div>
             ))}
+
             <div style={{display:"flex",gap:10,marginTop:16}}>
               <button type="button" className="btn btn-secondary" style={{flex:1}} onClick={()=>setStep(1)}>← Indietro</button>
-              <button type="submit" className="btn btn-primary" style={{flex:2}} disabled={saving||!form.codice_istituto}>
-                {saving?"Salvo…":"Salva figlio"}
+              <button type="submit" className="btn btn-primary" style={{flex:2}} disabled={saving}>
+                {saving ? "Salvo…" : "Salva figlio"}
               </button>
             </div>
           </form>
